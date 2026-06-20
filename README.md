@@ -1,0 +1,1 @@
+# competitor_analyzer-mcp-server
