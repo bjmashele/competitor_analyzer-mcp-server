@@ -517,3 +517,16 @@ def extract_competitors_from_context(context: str) -> list:
             competitors.extend([comp.strip() for comp in found_comps if comp.strip()])
 
     return list(set(competitors))[:5]  # Remove duplicates and limit
+
+## **************************************************************************** ##
+
+# Start the MCP server in a background thread
+def start_mcp_server():
+    mcp.run(transport="streamable-http")
+
+server_thread = threading.Thread(target=start_mcp_server, daemon=True)
+server_thread.start()
+
+# Brief pause to allow the server to fully start
+time.sleep(3)
+print("MCP server started on http://127.0.0.1:8000/mcp")
