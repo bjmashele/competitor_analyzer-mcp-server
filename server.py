@@ -344,4 +344,101 @@ def rank_competitors(competitor_candidates: list, exclude_company: str) -> list:
 
     # Count occurrences and return most frequent
     competitor_counts = Counter(filtered_competitors)
-    return [comp for comp, count in competitor_counts.most_common()]
+    return [comp for comp, count in competitor_counts.most_common()] 
+
+## **************************************************************************** ##
+
+@mcp.tool()
+def browse_page(url: str, instructions: str) -> str:
+    """
+    Browse a webpage and extract information based on instructions using web scraping.
+    Args:
+        url (str): The URL to browse.
+        instructions (str): Instructions for what information to extract.
+    Returns:
+        str: Extracted information or error message.
+    """
+    print(f"[INSIDE TOOL]: browse_page - scraping {url} for '{instructions}'")
+
+    try:
+        # Validate and prepare URL
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+
+        # Fetch webpage content
+        content = fetch_webpage_content(url)
+        if not content:
+            return f"Failed to fetch content from {url}"
+
+        # Extract relevant text based on instructions
+        extracted_text = extract_relevant_content(content, instructions)
+
+        return extracted_text if extracted_text else "No relevant content found based on the instructions"
+
+    except Exception as e:
+        return f"Error browsing page: {str(e)}"
+
+def fetch_webpage_content(url: str) -> str:
+    """Fetch webpage content with proper headers"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        # Parse HTML and extract main text content
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Remove script and style elements
+        for script in soup(["script", "style", "nav", "footer", "header"]):
+            script.decompose()
+
+        # Get text from main content areas
+        main_content = soup.find_all(['main', 'article', 'div', 'p'])
+        text_parts = []
+
+        for element in main_content:
+            text = element.get_text(strip=True)
+            if text and len(text) > 20:  # Only include substantial text
+                text_parts.append(text)
+
+        return ' '.join(text_parts[:5000])  # Limit length
+
+    except Exception as e:
+        print(f"Error fetching {url}: {e}")
+        return None
+
+def extract_relevant_content(content: str, instructions: str) -> str:
+    """Extract content relevant to the instructions"""
+    content_lower = content.lower()
+    instructions_lower = instructions.lower()
+
+    # Split content into sentences for better matching
+    sentences = [s.strip() for s in content.split('.') if s.strip()]
+
+    relevant_sentences = []
+
+    # Simple keyword matching based on instructions
+    for sentence in sentences:
+        sentence_lower = sentence.lower()
+
+        # Check if sentence contains words from instructions
+        instruction_words = set(instructions_lower.split())
+        sentence_words = set(sentence_lower.split())
+
+        # Count matching words
+        matching_words = instruction_words.intersection(sentence_words)
+
+        # If substantial match, include the sentence
+        if len(matching_words) >= 1 and len(sentence) > 10:
+            relevant_sentences.append(sentence)
+
+    # If no specific matches found, return first few sentences as summary
+    if not relevant_sentences and sentences:
+        return '. '.join(sentences[:5]) + '...'
+
+    return '. '.join(relevant_sentences[:10])  # Limit to top 10 relevant sentences 
+
