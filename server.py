@@ -442,3 +442,78 @@ def extract_relevant_content(content: str, instructions: str) -> str:
 
     return '. '.join(relevant_sentences[:10])  # Limit to top 10 relevant sentences 
 
+
+@mcp.tool()
+def generate_report(company_name: str, context: str) -> str:
+    """
+    Generate a competitive analysis report with a comparison table and actionable insights for the input company.
+    Args:
+        company_name: The name of the company to analyze.
+        context: Retrieved context from tools.
+    Returns:
+        str: Formatted report.
+    """
+    print("[INSIDE TOOL]: generate_report")
+
+    # Parse competitors from context instead of using static placeholders
+    competitors = extract_competitors_from_context(context)
+
+    # Build dynamic competitor rows
+    competitor_rows = ""
+    for i, competitor in enumerate(competitors[:3]):  # Top 3 competitors
+        competitor_rows += f"| {competitor} | - | - | - | - |\n"
+
+    # If no competitors found, use placeholders but indicate this
+    if not competitor_rows:
+        competitor_rows = "| Competitor A | - | - | - | - |\n| Competitor B | - | - | - | - |\n| Competitor C | - | - | - | - |"
+
+    # Simple template-based report (NO LLM calls) with dynamic data
+    report_template = f"""
+# Competitive Analysis Report: {company_name}
+
+## Executive Summary
+Analysis of {company_name}'s competitive position based on available market data.
+
+## Competitor Comparison
+
+| Competitor | Strategy Type | Key Tactics | Strengths | Weaknesses |
+|------------|---------------|-------------|-----------|------------|
+{competitor_rows}
+
+## Actionable Insights for {company_name}
+- Develop differentiated positioning in the market
+- Focus on unique value propositions
+- Optimize operational efficiencies
+- Enhance customer engagement strategies
+
+*Report generated from context data. Fill in specific details based on comprehensive market research.*
+"""
+
+    return report_template.strip()
+
+def extract_competitors_from_context(context: str) -> list:
+    """Extract competitor names from context string"""
+    competitors = []
+
+    # Look for comma-separated competitor lists
+    if ", " in context:
+        potential_competitors = context.split(", ")
+        for comp in potential_competitors:
+            if comp and len(comp) > 2 and comp[0].isupper():
+                competitors.append(comp)
+
+    # Look for known competitor patterns
+    import re
+    competitor_patterns = [
+        r'competitors?[:\s]+([^\.\n]+)',
+        r'top.*companies?[:\s]+([^\.\n]+)',
+    ]
+
+    for pattern in competitor_patterns:
+        matches = re.findall(pattern, context, re.IGNORECASE)
+        for match in matches:
+            # Split by common separators
+            found_comps = re.split(r',|\band\b', match)
+            competitors.extend([comp.strip() for comp in found_comps if comp.strip()])
+
+    return list(set(competitors))[:5]  # Remove duplicates and limit
