@@ -197,3 +197,151 @@ def determine_primary_sector(sectors_list: list) -> str:
         return most_common[0]
 
     return ""
+
+
+## **************************************************************************** ##
+
+@mcp.tool()
+def identify_competitors(sector: str, company_name: str) -> str:
+    """
+    Identify top 3 competitors using comprehensive web search analysis.
+    Args:
+        sector (str): The industry sector.
+        company_name (str): The name of the company to exclude.
+    Returns:
+        str: Comma-separated list of top 3 competitors.
+    """
+    print(f"[INSIDE TOOL]: identify_competitors - analyzing '{sector}' sector excluding '{company_name}'")
+
+    try:
+        competitor_candidates = []
+
+        # Query 1: General sector competitors
+        results1 = web_search_tool(f"top {sector} companies competitors market share")
+        candidates1 = extract_competitors_advanced(results1, company_name, sector)
+        competitor_candidates.extend(candidates1)
+
+        time.sleep(1)  # Rate limiting
+
+        # Query 2: Direct competitors of the company
+        results2 = web_search_tool(f"who are {company_name} main competitors in {sector}")
+        candidates2 = extract_competitors_advanced(results2, company_name, sector)
+        competitor_candidates.extend(candidates2)
+
+        time.sleep(1)
+
+        # Query 3: Industry analysis
+        results3 = web_search_tool(f"{sector} industry key players leading companies")
+        candidates3 = extract_competitors_advanced(results3, company_name, sector)
+        competitor_candidates.extend(candidates3)
+
+        # Filter and rank competitors
+        final_competitors = rank_competitors(competitor_candidates, company_name)
+
+        if final_competitors:
+            top_3 = final_competitors[:3]
+            return ", ".join(top_3)
+        else:
+            return "No competitors identified"
+
+    except Exception as e:
+        return f"Error identifying competitors: {str(e)}"
+
+def extract_competitors_advanced(search_results: str, exclude_company: str, sector: str) -> list:
+    """Advanced competitor extraction with context awareness"""
+
+    exclude_lower = exclude_company.lower()
+    sector_lower = sector.lower()
+    results_lower = search_results.lower()
+
+    competitors = []
+
+    # Known company patterns in different sectors
+    sector_companies = {
+        "technology": ["microsoft", "apple", "amazon", "meta", "google", "ibm", "oracle", "intel"],
+        "finance": ["jpmorgan", "bank of america", "goldman sachs", "morgan stanley", "citi", "wells fargo"],
+        "healthcare": ["johnson & johnson", "pfizer", "merck", "novartis", "roche", "abbvie"],
+        "education": ["great learning", "coursera", "udemy", "edx", "khan academy", "byju's", "pluralsight"],
+        "retail": ["walmart", "target", "amazon", "home depot", "costco", "best buy"],
+        "automotive": ["toyota", "ford", "general motors", "honda", "bmw", "mercedes-benz"]
+    }
+
+    # Look for known companies in this sector
+    if sector_lower in sector_companies:
+        for company in sector_companies[sector_lower]:
+            if (company in results_lower and
+                company != exclude_lower and
+                company not in competitors):
+                competitors.append(company.title())
+
+    # Extract from list patterns
+    list_patterns = [
+        r'(?:competitors|companies|players):? ([^\.]+)',
+        r'(?:including|such as) ([^\.]+)',
+        r'top \d+ ([^:]+) companies',
+    ]
+
+    for pattern in list_patterns:
+        matches = re.findall(pattern, search_results, re.IGNORECASE)
+        for match in matches:
+            # Split and clean potential company names
+            potential_companies = re.split(r',|\band\b|\bor\b|;', match)
+            for comp in potential_companies:
+                comp = comp.strip()
+                if (is_likely_company_name(comp) and
+                    comp.lower() != exclude_lower and
+                    comp not in competitors):
+                    competitors.append(comp)
+
+    # Extract from numbered/bulleted lists
+    numbered_pattern = r'\b\d+\.\s*([A-Z][a-zA-Z\s&]+?)(?=\.|\n|$)'
+    matches = re.findall(numbered_pattern, search_results)
+    for match in matches:
+        comp = match.strip()
+        if (is_likely_company_name(comp) and
+            comp.lower() != exclude_lower and
+            comp not in competitors):
+            competitors.append(comp)
+
+    return competitors
+
+def is_likely_company_name(text: str) -> bool:
+    """Check if text looks like a company name"""
+    if not text or len(text) < 2:
+        return False
+
+    # Exclude common non-company words
+    non_company_words = {
+        'the', 'and', 'or', 'but', 'with', 'for', 'from', 'that', 'this',
+        'these', 'those', 'their', 'other', 'some', 'such', 'including',
+        'etc', 'etc.', 'among', 'various', 'several', 'many'
+    }
+
+    words = text.lower().split()
+    if any(word in non_company_words for word in words):
+        return False
+
+    # Should start with capital letter and have reasonable length
+    return (text[0].isupper() and
+            len(text) <= 50 and
+            any(c.isalpha() for c in text))
+
+def rank_competitors(competitor_candidates: list, exclude_company: str) -> list:
+    """Rank competitors by frequency and relevance"""
+    if not competitor_candidates:
+        return []
+
+    exclude_lower = exclude_company.lower()
+
+    # Filter out the excluded company and clean the list
+    filtered_competitors = [
+        comp for comp in competitor_candidates
+        if comp.lower() != exclude_lower and comp.strip()
+    ]
+
+    if not filtered_competitors:
+        return []
+
+    # Count occurrences and return most frequent
+    competitor_counts = Counter(filtered_competitors)
+    return [comp for comp, count in competitor_counts.most_common()]
