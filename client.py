@@ -88,3 +88,6 @@ prompt_templates = PromptTemplates(
     final_answer=final_answer_prompts
 )
 
+
+# Initialize search tool 
+web_search_tool = DuckDuckGoSearchTool(max_results=5, rate_limit=2.0)
